@@ -54,7 +54,48 @@ namespace twentyQserver
 
         private void HandleClient(TcpClient client)
         {
-            
+            Console.WriteLine("New user connected to the server");
+
+            while(TestConnection(client))
+            {
+                // Parse commands from clients here?
+            }
+
+            Console.WriteLine("Client disconnected from server");
+        }
+
+        /**
+         * This is a function to help the server determine whether or
+         * not some client has disconnected from it.
+         */ 
+        private static bool TestConnection(TcpClient client)
+        {
+            bool isConnected = true;
+
+            // Check the status of the client
+            if(client.Client.Poll(0, SelectMode.SelectRead))
+            {
+                if (!client.Connected)
+                    isConnected = false;
+                else
+                {
+                    byte[] b = new byte[1];
+
+                    try
+                    {
+                        // If we get a zero then the client has disconnected
+                        if (client.Client.Receive(b, SocketFlags.Peek) == 0)
+                            isConnected = false;
+                    }
+                    catch
+                    {
+                        // If the process fails then the client has disconnected
+                        isConnected = false;
+                    }
+                }
+            }
+
+            return isConnected;
         }
     }
 }
