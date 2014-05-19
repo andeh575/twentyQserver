@@ -52,13 +52,60 @@ namespace twentyQserver
 
         }
 
+        /**
+         * Main client handler - directs commands to appropriate function
+         */ 
         private void HandleClient(TcpClient client)
         {
             Console.WriteLine("New user connected to the server");
+            byte[] packetCommand = new byte[2];
+            byte[] packetData = new byte[254];  // The remainder of the 256 allowance
+            client.GetStream().Read(packetCommand, 0, 2);
+
+            string command = BitConverter.ToString(packetCommand);
 
             while(TestConnection(client))
             {
-                // Parse commands from clients here?
+                client.GetStream().Read(packetData, 2, 254);
+                switch(command)
+                {
+                    case "Q:":
+                        Console.WriteLine("Received Command: {0}", command);
+                        serverQuit(client, packetData);
+                        break;
+
+                    case "?:":
+                        Console.WriteLine("Received Command: {0}", command);
+                        serverQuestion(client, packetData);
+                        client.GetStream().Read(packetCommand, 0, 2);
+                        break;
+
+                    case "A:":
+                        Console.WriteLine("Received Command: {0}", command);
+                        serverAnswer(client, packetData);
+                        client.GetStream().Read(packetCommand, 0, 2);
+                        break;
+
+                    case "E:":
+                        Console.WriteLine("Received Command: {0}", command);
+                        serverEnd(client, packetData);
+                        client.GetStream().Read(packetCommand, 0, 2);
+                        break;
+
+                    case "S:":
+                        Console.WriteLine("Received Command: {0}", command);
+                        serverStart(client, packetData);
+                        client.GetStream().Read(packetCommand, 0, 2);
+                        break;
+
+                    default:
+                        Console.WriteLine("Invalid Command: {0}", command);
+                        serverInvalid(client);
+                        client.GetStream().Read(packetCommand, 0, 2);
+                        break;
+
+                }
+                
             }
 
             Console.WriteLine("Client disconnected from server");
@@ -96,6 +143,54 @@ namespace twentyQserver
             }
 
             return isConnected;
+        }
+
+        /**
+         * Client wants to exist the game and close the connect
+         */
+        private void serverQuit(TcpClient client, byte[] data)
+        {
+            Console.WriteLine("QUIT");
+        }
+
+        /**
+         * Client wants to submit a question to the current game
+         */
+        private void serverQuestion(TcpClient client, byte[] data)
+        {
+            Console.WriteLine("QUESTION");
+        }
+
+        /**
+         * Client wants to send an answer to the current game
+         */
+        private void serverAnswer(TcpClient client, byte[] data)
+        {
+            Console.WriteLine("ANSWER");
+        }
+
+        /**
+         * Client wants to start a game - sending client is now the host
+         */
+        private void serverStart(TcpClient client, byte[] data)
+        {
+            Console.WriteLine("START");
+        }
+
+        /**
+         * Client notifies game session that the current game has ended
+         */
+        private void serverEnd(TcpClient client, byte[] data)
+        {
+            Console.WriteLine("END");
+        }
+
+        /**
+         * Client has sent a message in an invalid format - only notify sender
+         */
+        private void serverInvalid(TcpClient client)
+        {
+            Console.WriteLine("Invalid packet received");
         }
     }
 }
