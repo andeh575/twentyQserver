@@ -58,9 +58,19 @@ namespace twentyQserver
         private void HandleClient(TcpClient client)
         {
             Console.WriteLine("New user connected to the server");
-            byte[] packetCommand = new byte[2];
-            byte[] packetData = new byte[254];  // The remainder of the 256 allowance
-            client.GetStream().Read(packetCommand, 0, 2);
+            byte[] packetCommand = new byte[2]; // The command from the client
+            byte[] packetData = new byte[254];  // The remainder of the 256 allowance - data
+
+            // Try-Catch needed in case the client forcibly ends the connection
+            try
+            {
+                client.GetStream().Read(packetCommand, 0, 2);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            
 
             string command = BitConverter.ToString(packetCommand);
 
