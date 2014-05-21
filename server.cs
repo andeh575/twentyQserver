@@ -16,6 +16,7 @@ namespace twentyQserver
         public static Hashtable clientsList = new Hashtable();
         private TcpListener listener;
         private Thread listenerThread;
+        private enum control {caller, others, all};
 
         /**
          * Constructor
@@ -96,7 +97,6 @@ namespace twentyQserver
                     try
                     {
                         client.GetStream().Read(packetData, 0, 254);
-                        string data = Encoding.ASCII.GetString(packetData);
                     }
                     catch (Exception ex)
                     {
@@ -147,6 +147,7 @@ namespace twentyQserver
                 
             }
 
+            clientsList.Remove(client.Client.Handle);
             Console.WriteLine("Client disconnected from server");
         }
 
@@ -190,6 +191,8 @@ namespace twentyQserver
         private void serverQuit(TcpClient client, byte[] data)
         {
             Console.WriteLine("QUIT");
+
+            //Broadcast(data, control.all, client);
         }
 
         /**
@@ -198,6 +201,8 @@ namespace twentyQserver
         private void serverQuestion(TcpClient client, byte[] data)
         {
             Console.WriteLine("QUESTION");
+
+            Broadcast(data, control.all, client);
         }
 
         /**
@@ -206,6 +211,8 @@ namespace twentyQserver
         private void serverAnswer(TcpClient client, byte[] data)
         {
             Console.WriteLine("ANSWER");
+
+            Broadcast(data, control.others, client);
         }
 
         /**
@@ -214,6 +221,8 @@ namespace twentyQserver
         private void serverStart(TcpClient client, byte[] data)
         {
             Console.WriteLine("START");
+
+            Broadcast(data, control.all, client);
         }
 
         /**
@@ -222,6 +231,8 @@ namespace twentyQserver
         private void serverEnd(TcpClient client, byte[] data)
         {
             Console.WriteLine("END");
+
+            Broadcast(data, control.all, client);
         }
 
         /**
@@ -229,15 +240,84 @@ namespace twentyQserver
          */
         private void serverInvalid(TcpClient client)
         {
+            byte[] data;
+            string error = "Invalid packet received";
+
+            data = Encoding.ASCII.GetBytes(error);
+
             Console.WriteLine("Invalid packet received");
+
+            Broadcast(data, control.caller, client);
         }
 
         /**
          * Function to transmit to specified clients
          */
-        private void Broadcast ()
+        private void Broadcast (byte[] message, control flag, TcpClient client)
         {
-            // Not Implemented Yet
+            if(flag == control.caller)
+            {
+                try
+                {
+                    client.GetStream().Write(message, 0, message.Length);
+                    client.GetStream().Flush();
+                    Console.WriteLine("Package sent to client: {0}", client.Client.Handle);
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            }
+            else if(flag == control.others)
+            {
+                foreach (TcpClient clientTemp in clientsList.Values)
+                {
+                    if (client.Client.Handle != clientTemp.Client.Handle)
+                    {
+                        try
+                        {
+                            clientTemp.GetStream().Write(message, 0, message.Length);
+                            clientTemp.GetStream().Flush();
+                            Console.WriteLine("Package sent to client: {0}", clientTemp.Client.Handle);
+                        }
+                        catch(Exception ex)
+                        {
+                            Console.WriteLine(ex.Message);
+                        }
+                    }
+                }
+            }
+            else // control.all
+            {
+                foreach (TcpClient clientTemp in clientsList.Values)
+                {
+                    try
+                    {
+                        clientTemp.GetStream().Write(message, 0, message.Length);
+                        clientTemp.GetStream().Flush();
+                        Console.WriteLine("Package sent to client: {0}", clientTemp.Client.Handle);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                }
+            }
         }
+
+        /**
+         * Function to help the server package data into the proper
+         * format that the clients will expect.
+         */
+        private byte[] packageData(string data)
+        {
+            byte[] message;
+
+            message = Encoding.ASCII.GetBytes(data);
+
+            return message;
+        }
+
+
     }
 }
