@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,14 +13,22 @@ namespace twentyQserver
     class server
     {
         public int Port { get; set; }
-        public TcpListener listener;
+        public static Hashtable clientsList = new Hashtable();
+        private TcpListener listener;
         private Thread listenerThread;
 
+        /**
+         * Constructor
+         */
         public server (int port)
         {
             this.Port = port;
         }
         
+        /**
+         * Function to initialize the server, listener thread and get it listening 
+         * on the designated port for any incoming IP address.
+         */
         public void start ()
         {
             listener = new TcpListener(new IPEndPoint(IPAddress.Any, Port));
@@ -28,19 +37,33 @@ namespace twentyQserver
             listenerThread.Start();
         }
 
+        /**
+         * Shuts down the server and ends it's listener thread
+         */
         public void stop()
         {
             listener.Stop();
             listenerThread.Abort();
         }
         
+        /**
+         * Thread that listens to the port and initializes connections
+         */
         private void Listener()
         {
+            IntPtr handle;
+
+            // Listen forever on PORT and accept any IP
             while(true)
             {
                 try
                 {
                     TcpClient client = listener.AcceptTcpClient();
+                    
+                    // Let's add this client to the hashTable
+                    handle = client.Client.Handle;
+                    clientsList.Add(handle, client);
+
                     new Thread(new ThreadStart(() => HandleClient(client))).Start();
                 }
                 catch (Exception ex)
@@ -69,6 +92,7 @@ namespace twentyQserver
                     client.GetStream().Read(packetCommand, 0, 2);
                     string command = Encoding.ASCII.GetString(packetCommand);
 
+                    // Try-catch needed in case the client forcibly ends the connection
                     try
                     {
                         client.GetStream().Read(packetData, 0, 254);
@@ -79,6 +103,7 @@ namespace twentyQserver
                         Console.WriteLine(ex.Message);
                     }
 
+                    // What command was issued to the server?
                     switch (command)
                     {
                         case "Q:":
@@ -112,6 +137,7 @@ namespace twentyQserver
                             break;
                     }
 
+                    // Clear the stream just in case a packet that was too large arrived
                     client.GetStream().Flush();
                 }
                 catch (Exception ex)
@@ -159,7 +185,7 @@ namespace twentyQserver
         }
 
         /**
-         * Client wants to exist the game and close the connect
+         * Client wants to exit the game and close the connect
          */
         private void serverQuit(TcpClient client, byte[] data)
         {
@@ -204,6 +230,14 @@ namespace twentyQserver
         private void serverInvalid(TcpClient client)
         {
             Console.WriteLine("Invalid packet received");
+        }
+
+        /**
+         * Function to transmit to specified clients
+         */
+        private void Broadcast ()
+        {
+            // Not Implemented Yet
         }
     }
 }
