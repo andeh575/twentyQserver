@@ -61,59 +61,62 @@ namespace twentyQserver
             byte[] packetCommand = new byte[2]; // The command from the client
             byte[] packetData = new byte[254];  // The remainder of the 256 allowance - data
 
-            // Try-Catch needed in case the client forcibly ends the connection
-            try
-            {
-                client.GetStream().Read(packetCommand, 0, 2);
-            }
-            catch(Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            
-
-            string command = BitConverter.ToString(packetCommand);
-
             while(TestConnection(client))
             {
-                client.GetStream().Read(packetData, 2, 254);
-                switch(command)
+                // Try-Catch needed in case the client forcibly ends the connection
+                try
                 {
-                    case "Q:":
-                        Console.WriteLine("Received Command: {0}", command);
-                        serverQuit(client, packetData);
-                        break;
+                    client.GetStream().Read(packetCommand, 0, 2);
+                    string command = Encoding.ASCII.GetString(packetCommand);
 
-                    case "?:":
-                        Console.WriteLine("Received Command: {0}", command);
-                        serverQuestion(client, packetData);
-                        client.GetStream().Read(packetCommand, 0, 2);
-                        break;
+                    try
+                    {
+                        client.GetStream().Read(packetData, 0, 254);
+                        string data = Encoding.ASCII.GetString(packetData);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
 
-                    case "A:":
-                        Console.WriteLine("Received Command: {0}", command);
-                        serverAnswer(client, packetData);
-                        client.GetStream().Read(packetCommand, 0, 2);
-                        break;
+                    switch (command)
+                    {
+                        case "Q:":
+                            Console.WriteLine("Received Command: {0}", command);
+                            serverQuit(client, packetData);
+                            break;
 
-                    case "E:":
-                        Console.WriteLine("Received Command: {0}", command);
-                        serverEnd(client, packetData);
-                        client.GetStream().Read(packetCommand, 0, 2);
-                        break;
+                        case "?:":
+                            Console.WriteLine("Received Command: {0}", command);
+                            serverQuestion(client, packetData);
+                            break;
 
-                    case "S:":
-                        Console.WriteLine("Received Command: {0}", command);
-                        serverStart(client, packetData);
-                        client.GetStream().Read(packetCommand, 0, 2);
-                        break;
+                        case "A:":
+                            Console.WriteLine("Received Command: {0}", command);
+                            serverAnswer(client, packetData);
+                            break;
 
-                    default:
-                        Console.WriteLine("Invalid Command: {0}", command);
-                        serverInvalid(client);
-                        client.GetStream().Read(packetCommand, 0, 2);
-                        break;
+                        case "E:":
+                            Console.WriteLine("Received Command: {0}", command);
+                            serverEnd(client, packetData);
+                            break;
 
+                        case "S:":
+                            Console.WriteLine("Received Command: {0}", command);
+                            serverStart(client, packetData);
+                            break;
+
+                        default:
+                            Console.WriteLine("Invalid Command: {0}", command);
+                            serverInvalid(client);
+                            break;
+                    }
+
+                    client.GetStream().Flush();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
                 }
                 
             }
