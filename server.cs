@@ -34,6 +34,8 @@ namespace twentyQserver
         {
             listener = new TcpListener(new IPEndPoint(IPAddress.Any, Port));
             listener.Start();
+
+            // Let's start a new thread to handle the listener()
             listenerThread = new Thread(new ThreadStart(Listener));
             listenerThread.Start();
         }
@@ -43,6 +45,7 @@ namespace twentyQserver
          */
         public void stop()
         {
+            // Tidy up all running threads
             listener.Stop();
             listenerThread.Abort();
         }
@@ -65,6 +68,7 @@ namespace twentyQserver
                     handle = client.Client.Handle;
                     clientsList.Add(handle, client);
 
+                    // Start the HandleClient thread to monitor their commands
                     new Thread(new ThreadStart(() => HandleClient(client))).Start();
                 }
                 catch (Exception ex)
@@ -147,6 +151,7 @@ namespace twentyQserver
                 
             }
 
+            // Make sure we tidy up the hash table
             clientsList.Remove(client.Client.Handle);
             Console.WriteLine("Client disconnected from server");
         }
@@ -159,7 +164,7 @@ namespace twentyQserver
         {
             bool isConnected = true;
 
-            // Check the status of the client
+            // Check the status of the client IOT detect a forced exit
             if(client.Client.Poll(0, SelectMode.SelectRead))
             {
                 if (!client.Connected)
@@ -170,7 +175,7 @@ namespace twentyQserver
 
                     try
                     {
-                        // If we get a zero then the client has disconnected
+                        // If the client doesn't receive the test byte then they're gone
                         if (client.Client.Receive(b, SocketFlags.Peek) == 0)
                             isConnected = false;
                     }
@@ -191,8 +196,6 @@ namespace twentyQserver
         private void serverQuit(TcpClient client, byte[] data)
         {
             Console.WriteLine("QUIT");
-
-            //Broadcast(data, control.all, client);
         }
 
         /**
@@ -255,6 +258,7 @@ namespace twentyQserver
          */
         private void Broadcast (byte[] message, control flag, TcpClient client)
         {
+            // Send these messages only to the person who sent the original packet
             if(flag == control.caller)
             {
                 try
@@ -268,6 +272,7 @@ namespace twentyQserver
                     Console.WriteLine(ex.Message);
                 }
             }
+            // Send these messages to everyone BUT the person who sent the original packet
             else if(flag == control.others)
             {
                 foreach (TcpClient clientTemp in clientsList.Values)
@@ -287,7 +292,8 @@ namespace twentyQserver
                     }
                 }
             }
-            else // control.all
+            // Broadcast these messages to all active clients
+            else // Control.all
             {
                 foreach (TcpClient clientTemp in clientsList.Values)
                 {
