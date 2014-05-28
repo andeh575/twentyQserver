@@ -1,4 +1,11 @@
-﻿using System;
+﻿/* Author:  Andrew Graham
+ * Date:    27 May 2014
+ * Purpose: Threaded server implementation of the TwentyQuestions game. Services multiple
+ *          clients, monitors client connectivity, and relays messages from players of the
+ *          game.
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
@@ -17,8 +24,9 @@ namespace twentyQserver
         private TcpListener listener;
         private Thread listenerThread;
         private enum control {caller, others, all};
+        private IntPtr host;
 
-        /**
+        /*
          * Constructor
          */
         public server (int port)
@@ -26,7 +34,7 @@ namespace twentyQserver
             this.Port = port;
         }
         
-        /**
+        /*
          * Function to initialize the server, listener thread and get it listening 
          * on the designated port for any incoming IP address.
          */
@@ -40,17 +48,36 @@ namespace twentyQserver
             listenerThread.Start();
         }
 
-        /**
+        /*
          * Shuts down the server and ends it's listener thread
          */
         public void stop()
         {
-            // Tidy up all running threads
+            byte[] data;
+            string quitMessage = "Server shutting down...";
+
+            quitMessage = quitMessage.PadRight(254);
+
+            data = Encoding.ASCII.GetBytes(quitMessage);
+
+            foreach (TcpClient clientTemp in clientsList.Values)
+            {
+                try
+                {
+                    Broadcast(data, control.caller, clientTemp);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            }
+
+            // Close the listener thread
             listener.Stop();
             listenerThread.Abort();
         }
         
-        /**
+        /*
          * Thread that listens to the port and initializes connections
          */
         private void Listener()
@@ -80,7 +107,7 @@ namespace twentyQserver
 
         }
 
-        /**
+        /*
          * Main client handler - directs commands to appropriate function
          */ 
         private void HandleClient(TcpClient client)
@@ -112,7 +139,7 @@ namespace twentyQserver
                     {
                         case "Q:":
                             Console.WriteLine("Received Command: {0}", command);
-                            serverQuit(client, packetData);
+                            serverQuit(client);
                             break;
 
                         case "?:":
@@ -156,7 +183,7 @@ namespace twentyQserver
             Console.WriteLine("Client disconnected from server");
         }
 
-        /**
+        /*
          * This is a function to help the server determine whether or
          * not some client has disconnected from it.
          */ 
@@ -190,15 +217,22 @@ namespace twentyQserver
             return isConnected;
         }
 
-        /**
+        /*
          * Client wants to exit the game and close the connect
          */
-        private void serverQuit(TcpClient client, byte[] data)
+        private void serverQuit(TcpClient client)
         {
+            byte[] data;
+            string clientDisconnect = "A user has disconnected";
+
+            data = Encoding.ASCII.GetBytes(clientDisconnect);
+
             Console.WriteLine("QUIT");
+
+            Broadcast(data, control.all, client);
         }
 
-        /**
+        /*
          * Client wants to submit a question to the current game
          */
         private void serverQuestion(TcpClient client, byte[] data)
@@ -208,37 +242,49 @@ namespace twentyQserver
             Broadcast(data, control.all, client);
         }
 
-        /**
+        /*
          * Client wants to send an answer to the current game
          */
         private void serverAnswer(TcpClient client, byte[] data)
         {
-            Console.WriteLine("ANSWER");
+            if (client.Client.Handle == host)
+            {
+                Console.WriteLine("ANSWER");
 
-            Broadcast(data, control.others, client);
+                Broadcast(data, control.all, client);
+            }
+            else
+                serverNotHost(client);
         }
 
-        /**
+        /*
          * Client wants to start a game - sending client is now the host
          */
         private void serverStart(TcpClient client, byte[] data)
         {
             Console.WriteLine("START");
+            host = client.Client.Handle;
 
             Broadcast(data, control.all, client);
         }
 
-        /**
+        /*
          * Client notifies game session that the current game has ended
          */
         private void serverEnd(TcpClient client, byte[] data)
         {
-            Console.WriteLine("END");
+            if (client.Client.Handle == host)
+            {
+                Console.WriteLine("END");
+                host = (IntPtr)0;
 
-            Broadcast(data, control.all, client);
+                Broadcast(data, control.all, client);
+            }
+            else
+                serverNotHost(client);
         }
 
-        /**
+        /*
          * Client has sent a message in an invalid format - only notify sender
          */
         private void serverInvalid(TcpClient client)
@@ -253,7 +299,22 @@ namespace twentyQserver
             Broadcast(data, control.caller, client);
         }
 
-        /**
+        /*
+         * A player that is not the host has tried to perform a priviliged action
+         */
+        private void serverNotHost(TcpClient client)
+        {
+            byte[] data;
+            string error = "You aren't currently the host of this game!";
+
+            data = Encoding.ASCII.GetBytes(error);
+
+            Console.WriteLine("Command from non-Host!");
+
+            Broadcast(data, control.caller, client);
+        }
+
+        /*
          * Function to transmit to specified clients
          */
         private void Broadcast (byte[] message, control flag, TcpClient client)
@@ -311,7 +372,7 @@ namespace twentyQserver
             }
         }
 
-        /**
+        /*
          * Function to help the server package data into the proper
          * format that the clients will expect.
          */
